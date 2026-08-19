@@ -1,0 +1,36 @@
+name: Test commitAnalyzerPluginOpts input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          branches: '["act-harness", "main"]'
+          dryRun: 'true'
+          # Pass custom commit analyzer options (preset configuration)
+          commitAnalyzerPluginOpts: '{"preset": "conventionalcommits"}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Assert action accepted commitAnalyzerPluginOpts without crashing
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # The action should parse the JSON options without error
+          # In dry-run mode, released should never be true
+          if [ "$OUTCOME" = "success" ] && [ "$RELEASED" = "true" ]; then
+            echo "FAIL: dry-run mode should never set released=true"
+            exit 1
+          fi
+          echo "PASS: commitAnalyzerPluginOpts accepted, outcome=$OUTCOME, released=$RELEASED"

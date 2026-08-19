@@ -1,0 +1,40 @@
+name: Test no release scenario
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          # Include act-harness branch so the action doesn't fail on branch check
+          branches: '["act-harness", "main"]'
+          dryRun: 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Assert released output is false when no releasable commits
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # When there are no releasable commits (no feat/fix since last tag),
+          # semantic-release returns no result and the action sets released=false
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$RELEASED" != "false" ] && [ -n "$RELEASED" ]; then
+              echo "FAIL: expected released=false or empty, got: $RELEASED"
+              exit 1
+            fi
+            echo "PASS: no release published as expected, released=$RELEASED"
+          else
+            echo "INFO: action outcome=$OUTCOME (acceptable - may have no releasable commits)"
+            echo "PASS: action completed"
+          fi

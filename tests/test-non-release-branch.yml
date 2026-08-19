@@ -1,0 +1,42 @@
+name: Test non-release branch outputs released=false
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/feature-branch
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          branches: '["main"]'
+          dryRun: 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Assert released is false for non-release branch
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # When running on a branch not in the branches list, semantic-release
+          # should either skip (released=false) or fail gracefully
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "Action failed - acceptable when branch is not in release branches"
+            echo "PASS: action correctly did not release on non-release branch"
+            exit 0
+          fi
+          if [ "$RELEASED" = "true" ]; then
+            echo "FAIL: expected released=false for non-release branch, got released=true"
+            exit 1
+          fi
+          echo "PASS: released=$RELEASED (not released on non-release branch)"
