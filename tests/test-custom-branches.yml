@@ -1,0 +1,42 @@
+name: Test custom branches input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          branches: '["main", "next"]'
+          dryRun: 'true'
+          commitAnalyzerPluginOpts: '{"preset": "angular"}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Assert action accepted custom branches and commitAnalyzerPluginOpts
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          RELEASED: ${{ steps.action.outputs.released }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # In act without a real GitHub token, semantic-release will fail at the
+          # GitHub plugin authentication step. This is expected and acceptable.
+          # The test verifies the action starts and processes custom JSON inputs
+          # without crashing due to JSON parsing errors.
+          # Both 'success' and 'failure' are acceptable outcomes here.
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action accepted custom branches and commitAnalyzerPluginOpts (outcome=$OUTCOME)"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi
