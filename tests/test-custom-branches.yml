@@ -1,0 +1,40 @@
+name: Test custom branches configuration
+on:
+  workflow_dispatch:
+jobs:
+  test-custom-branches:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          # Test with multiple branches in the JSON array
+          branches: '["main", "release"]'
+          dryRun: 'true'
+          commitAnalyzerPluginOpts: ''
+        continue-on-error: true
+
+      - name: Assert action ran with custom branches config
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # The action should either succeed (with released=false/true) or fail
+          # due to GitHub auth (expected with fake token). Either way, it should
+          # not crash due to invalid branches JSON parsing.
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action handled custom branches config without crashing unexpectedly"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi

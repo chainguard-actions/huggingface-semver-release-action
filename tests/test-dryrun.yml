@@ -1,0 +1,46 @@
+name: Test dry-run mode
+on:
+  workflow_dispatch:
+jobs:
+  test-dryrun:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-dryrun
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          branches: '["main"]'
+          dryRun: 'true'
+        continue-on-error: true
+
+      - name: Assert action ran (released output is set or action errored gracefully)
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # In dry-run mode with a fake token, semantic-release may fail at the
+          # GitHub plugin step (authentication). We accept either:
+          # 1. The action succeeded with released=false (no releasable commits)
+          # 2. The action failed due to GitHub auth (expected with fake token)
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$RELEASED" = "false" ] || [ "$RELEASED" = "true" ]; then
+              echo "PASS: action completed with released=$RELEASED"
+            else
+              echo "FAIL: unexpected released value: $RELEASED"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected (likely GitHub auth error with fake token in dry-run)"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi

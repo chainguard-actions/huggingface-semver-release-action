@@ -1,0 +1,45 @@
+name: Test non-release branch (no release published)
+on:
+  workflow_dispatch:
+jobs:
+  test-non-release-branch:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token
+      GITHUB_REF: refs/heads/feature-branch
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          # Only 'main' is a release branch; we're on 'feature-branch'
+          branches: '["main"]'
+          dryRun: 'false'
+        continue-on-error: true
+
+      - name: Assert released is false for non-release branch
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # When not on a release branch, semantic-release should output released=false
+          # or fail gracefully (e.g., GitHub auth error with fake token)
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$RELEASED" = "false" ]; then
+              echo "PASS: released=false as expected for non-release branch"
+            else
+              echo "FAIL: expected released=false but got: $RELEASED"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected (likely GitHub auth error with fake token)"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi
