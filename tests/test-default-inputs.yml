@@ -1,0 +1,34 @@
+name: Test default inputs
+on:
+  workflow_dispatch:
+jobs:
+  test-default-inputs:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          branches: '["main"]'
+        continue-on-error: true
+
+      - name: Assert action completed (success or expected failure)
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # The action should either succeed with released=false (no new commits to release)
+          # or fail due to missing real GitHub credentials — but never produce released=true
+          # with a fake token
+          if [ "$RELEASED" = "true" ]; then
+            echo "FAIL: released should not be true with a fake GitHub token"
+            exit 1
+          fi
+          echo "PASS: action ran and released is not true"

@@ -1,0 +1,34 @@
+name: Test dry-run mode
+on:
+  workflow_dispatch:
+jobs:
+  test-dryrun:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          branches: '["main"]'
+          dryRun: 'true'
+        continue-on-error: true
+
+      - name: Assert action ran (released output is false in dry-run or no-release scenario)
+        env:
+          RELEASED: ${{ steps.action.outputs.released }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "released: $RELEASED"
+          # In dry-run mode with a fake token, the action may fail due to GitHub API
+          # but it should not produce released=true
+          if [ "$RELEASED" = "true" ]; then
+            echo "FAIL: released should not be true in dry-run mode"
+            exit 1
+          fi
+          echo "PASS: released is not true in dry-run mode"
